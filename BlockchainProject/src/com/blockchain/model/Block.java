@@ -10,53 +10,50 @@ import java.util.Date;
 public class Block {
     private final int index;
     private final long timestamp;
-    private final String data;
+    private final java.util.List<String> transactions;
+    private final String merkleRoot;
     private final String previousHash;
     private final String hash;
 
     /**
      * Constructor for a new block.
      * 
-     * @param index The position of the block in the chain.
-     * @param data The data (transaction) to be stored.
+     * @param index        The position of the block in the chain.
+     * @param transactions The list of transactions to be stored.
      * @param previousHash The hash of the previous block.
      */
-    public Block(int index, String data, String previousHash) {
+    public Block(int index, java.util.List<String> transactions, String previousHash) {
         this.index = index;
-        this.data = data;
+        this.transactions = transactions;
         this.previousHash = previousHash;
         this.timestamp = new Date().getTime();
+        this.merkleRoot = calculateMerkleRoot();
         this.hash = calculateHash();
     }
 
-    /**
-     * Constructor for re-creating a block (useful for verification/tampering tests if needed, 
-     * though typically we might tamper via setters or a mutable wrapper, checking purely via fields here).
-     * Actually for this simple design, we'll keep it simple. To "tamper", we might just need a way 
-     * to set a different data but keep the same hash, or vice versa. 
-     * Since fields are final, we can't easily tamper *this* object instance. 
-     * For the purpose of the assignment, we might want a 'TamperedBlock' subclass or method 
-     * that returns a new Block with modified data but old hash to prove validation fails.
-     * 
-     * See the 'tamperBlock' method idea in the Blockchain class which might replace a node.
-     */
-    
-    // Additional constructor mainly for 'tampering' purposes where we force a specific hash or data state
-    public Block(int index, String data, String previousHash, long timestamp, String hash) {
+    // Additional constructor mainly for 'tampering' purposes where we force a
+    // specific hash or data state
+    public Block(int index, java.util.List<String> transactions, String previousHash, long timestamp, String hash,
+            String merkleRoot) {
         this.index = index;
-        this.data = data;
+        this.transactions = transactions;
         this.previousHash = previousHash;
         this.timestamp = timestamp;
         this.hash = hash;
+        this.merkleRoot = merkleRoot;
     }
 
     public String calculateHash() {
         return HashUtil.applySha256(
                 index +
-                Long.toString(timestamp) +
-                previousHash +
-                data
-        );
+                        Long.toString(timestamp) +
+                        previousHash +
+                        merkleRoot);
+    }
+
+    private String calculateMerkleRoot() {
+        com.blockchain.ds.MerkleTree tree = new com.blockchain.ds.MerkleTree(transactions);
+        return tree.getRoot();
     }
 
     public int getIndex() {
@@ -67,8 +64,8 @@ public class Block {
         return timestamp;
     }
 
-    public String getData() {
-        return data;
+    public java.util.List<String> getTransactions() {
+        return transactions;
     }
 
     public String getPreviousHash() {
@@ -79,8 +76,13 @@ public class Block {
         return hash;
     }
 
+    public String getMerkleRoot() {
+        return merkleRoot;
+    }
+
     @Override
     public String toString() {
-        return "Block #" + index + " [Hash: " + hash + ", Prev: " + previousHash + ", Data: " + data + "]";
+        return "Block #" + index + " [Hash: " + hash + ", Prev: " + previousHash + ", MerkleRoot: " + merkleRoot
+                + ", TxCount: " + (transactions != null ? transactions.size() : 0) + "]";
     }
 }

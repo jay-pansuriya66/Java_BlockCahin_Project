@@ -1,11 +1,9 @@
 package com.blockchain.core;
 
-import com.blockchain.ds.AVLTree;
 import com.blockchain.model.Block;
-import java.util.List;
 
 public class Blockchain {
-    private AVLTree blockTree;
+    private java.util.List<Block> chain;
     private int latestIndex;
     private String latestHash;
     private java.util.function.Consumer<String> logger;
@@ -15,10 +13,22 @@ public class Blockchain {
     }
 
     public Blockchain(java.util.function.Consumer<String> logger) {
-        this.blockTree = new AVLTree();
-        this.latestIndex = -1;
-        this.latestHash = "0"; // Genesis previous hash
         this.logger = logger;
+        this.chain = com.blockchain.util.PersistenceManager.loadChain();
+
+        if (this.chain.isEmpty()) {
+            this.latestIndex = -1;
+            this.latestHash = "0"; // Genesis previous hash
+        } else {
+            Block lastBlock = this.chain.get(this.chain.size() - 1);
+            this.latestIndex = lastBlock.getIndex();
+            this.latestHash = lastBlock.getHash();
+            log("Loaded Blockchain from file. Size: " + this.chain.size());
+        }
+    }
+
+    private void save() {
+        com.blockchain.util.PersistenceManager.saveChain(chain);
     }
 
     private void log(String msg) {
@@ -28,27 +38,38 @@ public class Blockchain {
 
     public void addBlock(String data) {
         latestIndex++;
-        Block newBlock = new Block(latestIndex, data, latestHash);
+        // Parse comma-separated transactions
+        java.util.List<String> transactions = new java.util.ArrayList<>();
+        if (data != null && !data.trim().isEmpty()) {
+            String[] parts = data.split(",");
+            for (String part : parts) {
+                transactions.add(part.trim());
+            }
+        }
+
+        Block newBlock = new Block(latestIndex, transactions, latestHash);
 
         log("Mining Block " + latestIndex + "...");
-        blockTree.insert(newBlock);
+        chain.add(newBlock);
 
         latestHash = newBlock.getHash();
         log("Block " + latestIndex + " added: " + newBlock.getHash());
+        log("Merkle Root: " + newBlock.getMerkleRoot());
+        save();
     }
 
     public void displayChain() {
-        log("\n=== Blockchain Data (In-Order Traversal) ===");
-        blockTree.inOrder(logger);
-        log("============================================");
+        log("\n=== Blockchain Data ===");
+        for (Block block : chain) {
+            log(block.toString());
+        }
+        log("=======================");
     }
 
     public boolean isChainValid() {
-        List<Block> blocks = blockTree.getAllBlocks();
-
         // Loop through all blocks to check hash integrity
-        for (int i = 0; i < blocks.size(); i++) {
-            Block currentBlock = blocks.get(i);
+        for (int i = 0; i < chain.size(); i++) {
+            Block currentBlock = chain.get(i);
 
             // 1. Check if the hash is actually correct (re-calculate)
             if (!currentBlock.getHash().equals(currentBlock.calculateHash())) {
@@ -60,7 +81,7 @@ public class Blockchain {
 
             // 2. Check previous hash linkage (except for Genesis block)
             if (i > 0) {
-                Block previousBlock = blocks.get(i - 1);
+                Block previousBlock = chain.get(i - 1);
                 if (!currentBlock.getPreviousHash().equals(previousBlock.getHash())) {
                     log("CHAIN BREAKAGE DETECTED at Block " + currentBlock.getIndex());
                     log("Block PrevHash: " + currentBlock.getPreviousHash());
@@ -74,22 +95,54 @@ public class Blockchain {
                     return false;
                 }
             }
+
+            // 3. Check Merkle Root Integrity
+            // We reconstruct the Merkle Tree from the transactions and see if the root
+            // matches
+            com.blockchain.ds.MerkleTree tree = new com.blockchain.ds.MerkleTree(currentBlock.getTransactions());
+            if (!tree.getRoot().equals(currentBlock.getMerkleRoot())) {
+                log("MERKLE ROOT MISMATCH at Block " + currentBlock.getIndex());
+                log("Stored Root: " + currentBlock.getMerkleRoot());
+                log("Calc Root:   " + tree.getRoot());
+                return false;
+            }
         }
         return true;
     }
 
     public void tamperBlock(int index, String newData) {
-        List<Block> blocks = blockTree.getAllBlocks();
-        for (Block b : blocks) {
+        for (int i = 0; i < chain.size(); i++) {
+            Block b = chain.get(i);
             if (b.getIndex() == index) {
-                // Create a tampered block (same hash, different data)
-                Block tampered = new Block(b.getIndex(), newData, b.getPreviousHash(), b.getTimestamp(), b.getHash());
+                // Create a tampered block (same hash, different data/merkle root logic implied)
+                // Here we simulate tampering by changing the transactions but KEEPING the old
+                // hash and merkle root
+                // This means when we recalculate hash or merkle root, it won't match.
 
-                if (blockTree.updateBlock(index, tampered)) {
-                    log("Tampered with Block " + index + ": Data changed to '" + newData + "'");
-                } else {
-                    log("Failed to tamper block " + index);
-                }
+                java.util.List<String> tamperedTx = new java.util.ArrayList<>();
+                tamperedTx.add(newData); // Replace all txs with this one fake tx
+
+                // We deliberately keep the OLD hash and OLD Merkle Root to simulate that the
+                // header wasn't re-mined properly
+                // OR even if we re-mine it (update hash), the Merkle validation against the
+                // original might fail if we had an external reference (but here we just check
+                // internal consistency)
+
+                // If we want to show Merkle Root failure specifically:
+                // We keep the old Merkle Root but change the transactions.
+
+                Block tampered = new Block(
+                        b.getIndex(),
+                        tamperedTx,
+                        b.getPreviousHash(),
+                        b.getTimestamp(),
+                        b.getHash(),
+                        b.getMerkleRoot() // Keeping old root!
+                );
+
+                chain.set(i, tampered);
+                log("Tampered with Block " + index + ": Transactions replaced with '" + newData + "'");
+                save();
                 return;
             }
         }
