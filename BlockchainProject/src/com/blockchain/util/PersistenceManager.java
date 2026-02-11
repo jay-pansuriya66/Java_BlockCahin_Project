@@ -81,15 +81,21 @@ public class PersistenceManager {
                                 String recipient = (String) txMap.get("recipient");
                                 double amount = 0.0;
                                 Object amtObj = txMap.get("amount");
-                                if (amtObj instanceof Double)
-                                    amount = (Double) amtObj;
-                                else if (amtObj instanceof String)
-                                    amount = Double.parseDouble((String) amtObj);
+                                if (amtObj instanceof Number) {
+                                    amount = ((Number) amtObj).doubleValue();
+                                } else if (amtObj instanceof String) {
+                                    try {
+                                        amount = Double.parseDouble((String) amtObj);
+                                    } catch (NumberFormatException e) {
+                                        // keeping 0.0
+                                    }
+                                }
 
                                 long txTimestamp = 0;
                                 Object timeObj = txMap.get("timestamp");
-                                if (timeObj instanceof Long)
-                                    txTimestamp = (Long) timeObj;
+                                if (timeObj instanceof Number) {
+                                    txTimestamp = ((Number) timeObj).longValue();
+                                }
                                 // Handle potential parsing issues or defaults
 
                                 transactions.add(new Transaction(sender, recipient, amount, txTimestamp));

@@ -169,10 +169,10 @@ public class JsonUtil {
             map.put(key, unescape(rawValTrimmed.substring(1, rawValTrimmed.length() - 1)));
         } else {
             try {
-                if (key.equals("timestamp") || key.equals("index")) {
-                    // Clean up potential trailing comma or junk if any (though logic should handle
-                    // it)
+                if (key.equals("timestamp")) {
                     map.put(key, Long.parseLong(rawValTrimmed));
+                } else if (key.equals("index")) {
+                    map.put(key, Integer.parseInt(rawValTrimmed));
                 } else if (key.equals("amount")) {
                     map.put(key, Double.parseDouble(rawValTrimmed));
                 } else {
