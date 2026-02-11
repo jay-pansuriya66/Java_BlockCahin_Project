@@ -29,7 +29,11 @@ public class Blockchain {
     }
 
     private void save() {
-        com.blockchain.util.PersistenceManager.saveChain(chain);
+        if (isChainValid()) {
+            com.blockchain.util.PersistenceManager.saveChain(chain);
+        } else {
+            log("Blockchain is invalid. Data not saved.");
+        }
     }
 
     private void log(String msg) {
