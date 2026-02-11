@@ -9,13 +9,21 @@ import javax.swing.text.DefaultCaret;
 public class BlockchainGUI extends JFrame {
     private Blockchain blockchain;
     private JTextArea logArea;
-    private JTextField dataField;
+
+    // Add Block Fields
+    private JTextField senderField;
+    private JTextField recipientField;
+    private JTextField amountField;
+
+    // Tamper Fields
     private JTextField tamperIndexField;
-    private JTextField tamperDataField;
+    private JTextField tamperSenderField;
+    private JTextField tamperRecipientField;
+    private JTextField tamperAmountField;
 
     public BlockchainGUI() {
         setTitle("Blockchain Conceptualization");
-        setSize(800, 600);
+        setSize(900, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -44,12 +52,24 @@ public class BlockchainGUI extends JFrame {
         // 1. Add Block Panel
         JPanel addPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         addPanel.setBorder(BorderFactory.createTitledBorder("Add New Block"));
-        addPanel.add(new JLabel("Transaction Data:"));
-        dataField = new JTextField(40);
-        addPanel.add(dataField);
+
+        addPanel.add(new JLabel("Sender:"));
+        senderField = new JTextField(10);
+        addPanel.add(senderField);
+
+        addPanel.add(new JLabel("Recipient:"));
+        recipientField = new JTextField(10);
+        addPanel.add(recipientField);
+
+        addPanel.add(new JLabel("Amount:"));
+        amountField = new JTextField(8);
+        addPanel.add(amountField);
+
         JButton addButton = new JButton("Add Block");
         addButton.addActionListener(this::onAddBlock);
         addPanel.add(addButton);
+
+        controlsPanel.add(addPanel);
 
         // 2. Actions Panel
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -62,21 +82,32 @@ public class BlockchainGUI extends JFrame {
         validateButton.addActionListener(this::onValidate);
         actionPanel.add(validateButton);
 
+        controlsPanel.add(actionPanel);
+
         // 3. Tamper Panel
         JPanel tamperPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         tamperPanel.setBorder(BorderFactory.createTitledBorder("Simulate Attack"));
-        tamperPanel.add(new JLabel("Block Index:"));
-        tamperIndexField = new JTextField(5);
+
+        tamperPanel.add(new JLabel("Index:"));
+        tamperIndexField = new JTextField(3);
         tamperPanel.add(tamperIndexField);
-        tamperPanel.add(new JLabel("New (Fake) Data:"));
-        tamperDataField = new JTextField(20);
-        tamperPanel.add(tamperDataField);
+
+        tamperPanel.add(new JLabel("Fake Sender:"));
+        tamperSenderField = new JTextField(8);
+        tamperPanel.add(tamperSenderField);
+
+        tamperPanel.add(new JLabel("Fake Recip:"));
+        tamperRecipientField = new JTextField(8);
+        tamperPanel.add(tamperRecipientField);
+
+        tamperPanel.add(new JLabel("Fake Amt:"));
+        tamperAmountField = new JTextField(5);
+        tamperPanel.add(tamperAmountField);
+
         JButton tamperButton = new JButton("Tamper Block");
         tamperButton.addActionListener(this::onTamper);
         tamperPanel.add(tamperButton);
 
-        controlsPanel.add(addPanel);
-        controlsPanel.add(actionPanel);
         controlsPanel.add(tamperPanel);
 
         add(controlsPanel, BorderLayout.SOUTH);
@@ -91,13 +122,25 @@ public class BlockchainGUI extends JFrame {
     }
 
     private void onAddBlock(ActionEvent e) {
-        String data = dataField.getText().trim();
-        if (data.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter transaction data.");
+        String sender = senderField.getText().trim();
+        String recipient = recipientField.getText().trim();
+        String amountStr = amountField.getText().trim();
+
+        if (sender.isEmpty() || recipient.isEmpty() || amountStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter all transaction details.");
             return;
         }
-        blockchain.addBlock(data);
-        dataField.setText("");
+
+        try {
+            double amount = Double.parseDouble(amountStr);
+            blockchain.addBlock(sender, recipient, amount);
+
+            senderField.setText("");
+            recipientField.setText("");
+            amountField.setText("");
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid Amount. Please enter a number.");
+        }
     }
 
     private void onValidate(ActionEvent e) {
@@ -115,16 +158,25 @@ public class BlockchainGUI extends JFrame {
     private void onTamper(ActionEvent e) {
         try {
             int index = Integer.parseInt(tamperIndexField.getText().trim());
-            String data = tamperDataField.getText().trim();
-            if (data.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Please enter fake data.");
+            String sender = tamperSenderField.getText().trim();
+            String recipient = tamperRecipientField.getText().trim();
+            String amountStr = tamperAmountField.getText().trim();
+
+            if (sender.isEmpty() || recipient.isEmpty() || amountStr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter all fake transaction details.");
                 return;
             }
-            blockchain.tamperBlock(index, data);
+
+            double amount = Double.parseDouble(amountStr);
+            blockchain.tamperBlock(index, sender, recipient, amount);
+
             tamperIndexField.setText("");
-            tamperDataField.setText("");
+            tamperSenderField.setText("");
+            tamperRecipientField.setText("");
+            tamperAmountField.setText("");
+
         } catch (NumberFormatException error) {
-            JOptionPane.showMessageDialog(this, "Invalid Index.");
+            JOptionPane.showMessageDialog(this, "Invalid Index or Amount.");
         }
     }
 

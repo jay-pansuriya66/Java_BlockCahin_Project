@@ -1,6 +1,7 @@
 package com.blockchain.core;
 
 import com.blockchain.model.Block;
+import com.blockchain.model.Transaction;
 
 public class Blockchain {
     private java.util.List<Block> chain;
@@ -36,16 +37,12 @@ public class Blockchain {
             logger.accept(msg);
     }
 
-    public void addBlock(String data) {
+    public void addBlock(String sender, String recipient, double amount) {
         latestIndex++;
-        // Parse comma-separated transactions
-        java.util.List<String> transactions = new java.util.ArrayList<>();
-        if (data != null && !data.trim().isEmpty()) {
-            String[] parts = data.split(",");
-            for (String part : parts) {
-                transactions.add(part.trim());
-            }
-        }
+
+        Transaction tx = new Transaction(sender, recipient, amount);
+        java.util.List<Transaction> transactions = new java.util.ArrayList<>();
+        transactions.add(tx);
 
         Block newBlock = new Block(latestIndex, transactions, latestHash);
 
@@ -110,7 +107,7 @@ public class Blockchain {
         return true;
     }
 
-    public void tamperBlock(int index, String newData) {
+    public void tamperBlock(int index, String sender, String recipient, double amount) {
         for (int i = 0; i < chain.size(); i++) {
             Block b = chain.get(i);
             if (b.getIndex() == index) {
@@ -119,8 +116,8 @@ public class Blockchain {
                 // hash and merkle root
                 // This means when we recalculate hash or merkle root, it won't match.
 
-                java.util.List<String> tamperedTx = new java.util.ArrayList<>();
-                tamperedTx.add(newData); // Replace all txs with this one fake tx
+                java.util.List<Transaction> tamperedTx = new java.util.ArrayList<>();
+                tamperedTx.add(new Transaction(sender, recipient, amount));
 
                 // We deliberately keep the OLD hash and OLD Merkle Root to simulate that the
                 // header wasn't re-mined properly
@@ -141,7 +138,7 @@ public class Blockchain {
                 );
 
                 chain.set(i, tampered);
-                log("Tampered with Block " + index + ": Transactions replaced with '" + newData + "'");
+                log("Tampered with Block " + index + ": Transactions replaced.");
                 save();
                 return;
             }

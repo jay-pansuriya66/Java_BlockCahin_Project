@@ -8,7 +8,7 @@ public class MerkleTree {
 
     private String root;
 
-    public MerkleTree(List<String> transactions) {
+    public MerkleTree(List<com.blockchain.model.Transaction> transactions) {
         this.root = calculateMerkleRoot(transactions);
     }
 
@@ -16,17 +16,17 @@ public class MerkleTree {
         return root;
     }
 
-    private String calculateMerkleRoot(List<String> transactions) {
+    private String calculateMerkleRoot(List<com.blockchain.model.Transaction> transactions) {
         if (transactions == null || transactions.isEmpty()) {
             return "";
         }
 
-        List<String> tempTxList = new ArrayList<>(transactions);
+        List<com.blockchain.model.Transaction> tempTxList = new ArrayList<>(transactions);
 
         // Convert all transactions to their hashes
         List<String> hashes = new ArrayList<>();
-        for (String tx : tempTxList) {
-            hashes.add(HashUtil.applySha256(tx));
+        for (com.blockchain.model.Transaction tx : tempTxList) {
+            hashes.add(tx.calculateHash());
         }
 
         // Recursively find the Merkle Root

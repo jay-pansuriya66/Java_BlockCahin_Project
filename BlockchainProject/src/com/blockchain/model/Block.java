@@ -10,7 +10,7 @@ import java.util.Date;
 public class Block {
     private final int index;
     private final long timestamp;
-    private final java.util.List<String> transactions;
+    private final java.util.List<Transaction> transactions;
     private final String merkleRoot;
     private final String previousHash;
     private final String hash;
@@ -22,7 +22,7 @@ public class Block {
      * @param transactions The list of transactions to be stored.
      * @param previousHash The hash of the previous block.
      */
-    public Block(int index, java.util.List<String> transactions, String previousHash) {
+    public Block(int index, java.util.List<Transaction> transactions, String previousHash) {
         this.index = index;
         this.transactions = transactions;
         this.previousHash = previousHash;
@@ -33,7 +33,7 @@ public class Block {
 
     // Additional constructor mainly for 'tampering' purposes where we force a
     // specific hash or data state
-    public Block(int index, java.util.List<String> transactions, String previousHash, long timestamp, String hash,
+    public Block(int index, java.util.List<Transaction> transactions, String previousHash, long timestamp, String hash,
             String merkleRoot) {
         this.index = index;
         this.transactions = transactions;
@@ -64,7 +64,7 @@ public class Block {
         return timestamp;
     }
 
-    public java.util.List<String> getTransactions() {
+    public java.util.List<Transaction> getTransactions() {
         return transactions;
     }
 

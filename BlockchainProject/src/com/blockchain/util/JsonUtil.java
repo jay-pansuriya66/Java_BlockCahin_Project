@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A very simple JSON parser/writer tailored for this Blockchain project.
- * NOTE: This is NOT a full JSON parser. It assumes a specific structure.
+ * A simple JSON parser/writer tailored for this Blockchain project.
+ * Updated to support list of objects for transactions.
  */
 public class JsonUtil {
 
@@ -24,7 +24,7 @@ public class JsonUtil {
     }
 
     // Parses a simple JSON object string into a Map
-    // Expects flat key-values, except for "transactions" which is a list of strings
+    // Expects flat key-values, and strictly handles "transactions" list of objects
     public static Map<String, Object> parseBlockJson(String json) {
         Map<String, Object> map = new HashMap<>();
         json = json.trim();
@@ -33,59 +33,157 @@ public class JsonUtil {
         if (json.endsWith("}"))
             json = json.substring(0, json.length() - 1);
 
-        // Split by fields, but be careful about the list
-        // Strategy: Extract "transactions": [...] manually first
-
-        List<String> transactions = new ArrayList<>();
+        // 1. Extract and parse "transactions": [...]
+        List<Map<String, Object>> transactions = new ArrayList<>();
         int txStart = json.indexOf("\"transactions\":");
+        String jsonWithoutTx = json;
+
         if (txStart != -1) {
             int listStart = json.indexOf("[", txStart);
-            int listEnd = json.indexOf("]", listStart);
-            if (listStart != -1 && listEnd != -1) {
-                String listContent = json.substring(listStart + 1, listEnd);
-                // Parse array items (quoted strings)
-                String[] items = listContent.split(",");
-                for (String item : items) {
-                    item = item.trim();
-                    if (item.startsWith("\"") && item.endsWith("\"")) {
-                        transactions.add(unescape(item.substring(1, item.length() - 1)));
-                    }
-                }
+            if (listStart != -1) {
+                int listEnd = findMatchingBracket(json, listStart);
 
-                // Remove the list from json string to parse rest easily (hacky but works for
-                // this)
-                String part1 = json.substring(0, txStart);
-                String part2 = json.substring(listEnd + 1);
-                json = part1 + part2;
+                if (listEnd != -1) {
+                    String listContent = json.substring(listStart + 1, listEnd).trim();
+
+                    if (!listContent.isEmpty()) {
+                        // Parse list of objects: { ... }, { ... }
+                        List<String> txObjects = splitObjects(listContent);
+                        for (String txJson : txObjects) {
+                            transactions.add(parseSimpleJson(txJson));
+                        }
+                    }
+
+                    // Remove the list part to parse the rest
+                    String part1 = json.substring(0, txStart);
+                    String part2 = json.substring(listEnd + 1);
+                    jsonWithoutTx = part1 + part2;
+                }
             }
         }
         map.put("transactions", transactions);
 
-        // Parse remaining primitive fields
-        String[] pairs = json.split(",");
-        for (String pair : pairs) {
-            String[] kv = pair.split(":");
-            if (kv.length >= 2) {
-                String key = kv[0].trim().replace("\"", "");
-                String value = kv[1].trim();
-
-                if (value.startsWith("\"") && value.endsWith("\"")) {
-                    map.put(key, unescape(value.substring(1, value.length() - 1)));
-                } else {
-                    // Try parsing number
-                    try {
-                        if (key.equals("timestamp")) {
-                            map.put(key, Long.parseLong(value));
-                        } else if (key.equals("index")) {
-                            map.put(key, Integer.parseInt(value));
-                        }
-                    } catch (NumberFormatException e) {
-                        // ignore
-                    }
-                }
-            }
-        }
+        // 2. Parse remaining fields
+        parseFields(jsonWithoutTx, map);
 
         return map;
+    }
+
+    private static int findMatchingBracket(String text, int start) {
+        int count = 0;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '[')
+                count++;
+            else if (c == ']') {
+                count--;
+                if (count == 0)
+                    return i;
+            }
+        }
+        return -1;
+    }
+
+    private static List<String> splitObjects(String arrayContent) {
+        List<String> result = new ArrayList<>();
+        int braceCount = 0;
+        StringBuilder current = new StringBuilder();
+
+        for (int i = 0; i < arrayContent.length(); i++) {
+            char c = arrayContent.charAt(i);
+            if (c == '{')
+                braceCount++;
+            if (c == '}')
+                braceCount--;
+
+            if (c == ',' && braceCount == 0) {
+                String s = current.toString().trim();
+                if (!s.isEmpty())
+                    result.add(s);
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+        String last = current.toString().trim();
+        if (!last.isEmpty())
+            result.add(last);
+        return result;
+    }
+
+    private static Map<String, Object> parseSimpleJson(String json) {
+        Map<String, Object> map = new HashMap<>();
+        json = json.trim();
+        if (json.startsWith("{")) {
+            json = json.substring(1);
+        }
+        if (json.endsWith("}")) {
+            json = json.substring(0, json.length() - 1);
+        }
+
+        parseFields(json, map);
+        return map;
+    }
+
+    private static void parseFields(String json, Map<String, Object> map) {
+        StringBuilder key = new StringBuilder();
+        StringBuilder val = new StringBuilder();
+        boolean inQuote = false;
+        boolean parsingKey = true;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            if (c == '"')
+                inQuote = !inQuote;
+
+            if (c == ':' && !inQuote && parsingKey) {
+                parsingKey = false;
+                continue;
+            }
+
+            if (c == ',' && !inQuote) {
+                saveEntry(key.toString(), val.toString(), map);
+                key.setLength(0);
+                val.setLength(0);
+                parsingKey = true;
+                continue;
+            }
+
+            if (parsingKey)
+                key.append(c);
+            else
+                val.append(c);
+        }
+        saveEntry(key.toString(), val.toString(), map);
+    }
+
+    private static void saveEntry(String rawKey, String rawVal, Map<String, Object> map) {
+        String key = rawKey.trim().replace("\"", "");
+        String rawValTrimmed = rawVal.trim();
+
+        if (key.isEmpty())
+            return;
+
+        if (rawValTrimmed.startsWith("\"") && rawValTrimmed.endsWith("\"")) {
+            map.put(key, unescape(rawValTrimmed.substring(1, rawValTrimmed.length() - 1)));
+        } else {
+            try {
+                if (key.equals("timestamp") || key.equals("index")) {
+                    // Clean up potential trailing comma or junk if any (though logic should handle
+                    // it)
+                    map.put(key, Long.parseLong(rawValTrimmed));
+                } else if (key.equals("amount")) {
+                    map.put(key, Double.parseDouble(rawValTrimmed));
+                } else {
+                    if (rawValTrimmed.contains("."))
+                        map.put(key, Double.parseDouble(rawValTrimmed));
+                    else
+                        map.put(key, Long.parseLong(rawValTrimmed));
+                }
+            } catch (NumberFormatException e) {
+                map.put(key, rawValTrimmed); // fallback
+            }
+        }
     }
 }

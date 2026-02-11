@@ -1,6 +1,7 @@
 package com.blockchain.util;
 
 import com.blockchain.model.Block;
+import com.blockchain.model.Transaction;
 import java.io.*;
 import java.nio.file.*;
 import java.util.ArrayList;
@@ -72,7 +73,28 @@ public class PersistenceManager {
                         String hash = (String) map.get("hash");
                         String merkleRoot = (String) map.get("merkleRoot");
                         @SuppressWarnings("unchecked")
-                        List<String> transactions = (List<String>) map.get("transactions");
+                        List<Map<String, Object>> txMaps = (List<Map<String, Object>>) map.get("transactions");
+                        List<Transaction> transactions = new ArrayList<>();
+                        if (txMaps != null) {
+                            for (Map<String, Object> txMap : txMaps) {
+                                String sender = (String) txMap.get("sender");
+                                String recipient = (String) txMap.get("recipient");
+                                double amount = 0.0;
+                                Object amtObj = txMap.get("amount");
+                                if (amtObj instanceof Double)
+                                    amount = (Double) amtObj;
+                                else if (amtObj instanceof String)
+                                    amount = Double.parseDouble((String) amtObj);
+
+                                long txTimestamp = 0;
+                                Object timeObj = txMap.get("timestamp");
+                                if (timeObj instanceof Long)
+                                    txTimestamp = (Long) timeObj;
+                                // Handle potential parsing issues or defaults
+
+                                transactions.add(new Transaction(sender, recipient, amount, txTimestamp));
+                            }
+                        }
 
                         Block block = new Block(index, transactions, previousHash, timestamp, hash, merkleRoot);
                         chain.add(block);
@@ -99,9 +121,15 @@ public class PersistenceManager {
         sb.append("\"merkleRoot\":\"").append(JsonUtil.escape(b.getMerkleRoot())).append("\",");
 
         sb.append("\"transactions\":[");
-        List<String> txs = b.getTransactions();
+        List<Transaction> txs = b.getTransactions();
         for (int i = 0; i < txs.size(); i++) {
-            sb.append("\"").append(JsonUtil.escape(txs.get(i))).append("\"");
+            Transaction t = txs.get(i);
+            sb.append("{");
+            sb.append("\"sender\":\"").append(JsonUtil.escape(t.getSender())).append("\",");
+            sb.append("\"recipient\":\"").append(JsonUtil.escape(t.getRecipient())).append("\",");
+            sb.append("\"amount\":").append(t.getAmount()).append(",");
+            sb.append("\"timestamp\":").append(t.getTimestamp());
+            sb.append("}");
             if (i < txs.size() - 1)
                 sb.append(",");
         }
